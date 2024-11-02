@@ -27,8 +27,7 @@ We utilize pre-trained GloVe embeddings to represent words and explore different
   - [3. Model Enhancement and Evaluation](#3-model-enhancement-and-evaluation)
 - [Model Architectures](#model-architectures)
 - [Results](#results)
-- [Contributors](#contributors)
-- [License](#license)
+
 
 ---
 
