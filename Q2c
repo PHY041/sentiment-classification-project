@@ -1,0 +1,209 @@
+For sentence representation in RNN models (answering Part 2, Question 2c of the assignment), here are the main methods we can implement and compare:
+
+```python
+import torch
+import torch.nn as nn
+
+class RNNClassifierWithDifferentPooling(nn.Module):
+    def __init__(self, 
+                 embedding_layer: nn.Embedding,
+                 hidden_size: int = 256,
+                 num_layers: int = 2,
+                 dropout: float = 0.5,
+                 pooling_type: str = 'last'):
+        """
+        Args:
+            pooling_type: One of ['last', 'max', 'mean', 'attention', 'concat']
+        """
+        super().__init__()
+        
+        self.embedding = embedding_layer
+        self.hidden_size = hidden_size
+        self.pooling_type = pooling_type
+        
+        # RNN layer
+        self.rnn = nn.RNN(
+            input_size=embedding_layer.embedding_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # Attention layer if needed
+        if pooling_type == 'attention':
+            self.attention = nn.Linear(hidden_size, 1)
+            
+        # Output size depends on pooling type
+        if pooling_type == 'concat':
+            self.fc = nn.Linear(hidden_size * 3, 2)  # 3 for concatenating last, max, and mean
+        else:
+            self.fc = nn.Linear(hidden_size, 2)
+            
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, x):
+        # x shape: (batch_size, seq_length)
+        embedded = self.embedding(x)
+        # embedded shape: (batch_size, seq_length, embedding_dim)
+        
+        output, hidden = self.rnn(embedded)
+        # output shape: (batch_size, seq_length, hidden_size)
+        # hidden shape: (num_layers, batch_size, hidden_size)
+        
+        if self.pooling_type == 'last':
+            # Use the last hidden state
+            pooled = hidden[-1]
+            
+        elif self.pooling_type == 'max':
+            # Max pooling over sequence length
+            pooled = torch.max(output, dim=1)[0]
+            
+        elif self.pooling_type == 'mean':
+            # Mean pooling over sequence length
+            pooled = torch.mean(output, dim=1)
+            
+        elif self.pooling_type == 'attention':
+            # Attention pooling
+            attention_weights = torch.softmax(self.attention(output), dim=1)
+            pooled = torch.sum(output * attention_weights, dim=1)
+            
+        elif self.pooling_type == 'concat':
+            # Concatenate multiple pooling methods
+            last = hidden[-1]
+            max_pooled = torch.max(output, dim=1)[0]
+            mean_pooled = torch.mean(output, dim=1)
+            pooled = torch.cat([last, max_pooled, mean_pooled], dim=1)
+        
+        pooled = self.dropout(pooled)
+        output = self.fc(pooled)
+        return output
+
+# Function to compare different pooling methods
+def compare_pooling_methods(train_loader, val_loader, embedding_layer, device):
+    pooling_methods = ['last', 'max', 'mean', 'attention', 'concat']
+    results = {}
+    
+    for method in pooling_methods:
+        print(f"\nTraining model with {method} pooling...")
+        model = RNNClassifierWithDifferentPooling(
+            embedding_layer=embedding_layer,
+            pooling_type=method
+        ).to(device)
+        
+        # Training code here...
+        
+        # Store results
+        results[method] = {
+            'val_accuracy': val_accuracy,
+            'test_accuracy': test_accuracy
+        }
+    
+    return results
+
+```
+
+Here are the different methods for sentence representation and their characteristics:
+
+1. Last Hidden State (Basic)
+```python
+# Use the last hidden state of the RNN
+pooled = hidden[-1]
+```
+- Pros:
+  - Simple implementation
+  - Works well for shorter sequences
+- Cons:
+  - May lose information from earlier parts of sequence
+  - Performance degrades for long sequences
+
+2. Max Pooling
+```python
+# Max pooling over sequence length
+pooled = torch.max(output, dim=1)[0]
+```
+- Pros:
+  - Captures strongest features
+  - Less sensitive to sequence length
+- Cons:
+  - Loses temporal information
+  - Might miss subtle patterns
+
+3. Mean Pooling
+```python
+# Mean pooling over sequence length
+pooled = torch.mean(output, dim=1)
+```
+- Pros:
+  - Considers all time steps equally
+  - Stable representation
+- Cons:
+  - May dilute important signals
+  - Treats all positions equally
+
+4. Attention-based Pooling
+```python
+# Attention pooling
+attention_weights = torch.softmax(self.attention(output), dim=1)
+pooled = torch.sum(output * attention_weights, dim=1)
+```
+- Pros:
+  - Learns to focus on important parts
+  - Can capture complex dependencies
+- Cons:
+  - More parameters to train
+  - Computationally more expensive
+
+5. Concatenation of Multiple Methods
+```python
+# Concatenate multiple pooling methods
+last = hidden[-1]
+max_pooled = torch.max(output, dim=1)[0]
+mean_pooled = torch.mean(output, dim=1)
+pooled = torch.cat([last, max_pooled, mean_pooled], dim=1)
+```
+- Pros:
+  - Combines benefits of multiple methods
+  - More robust representation
+- Cons:
+  - Larger model size
+  - May be overkill for simple tasks
+
+Here's how to analyze the results:
+
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+def analyze_pooling_results(results):
+    # Create DataFrame for visualization
+    df = pd.DataFrame(results).T
+    
+    # Plot accuracies
+    plt.figure(figsize=(10, 6))
+    df[['val_accuracy', 'test_accuracy']].plot(kind='bar')
+    plt.title('Performance Comparison of Different Pooling Methods')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Pooling Method')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+    
+    # Print detailed results
+    print("\nDetailed Results:")
+    for method, scores in results.items():
+        print(f"\n{method} Pooling:")
+        print(f"Validation Accuracy: {scores['val_accuracy']:.4f}")
+        print(f"Test Accuracy: {scores['test_accuracy']:.4f}")
+
+```
+
+The results will likely show that:
+1. Attention-based pooling often performs best but is more complex
+2. Concatenation method provides robust results but with larger model size
+3. Max pooling often works surprisingly well for sentiment analysis
+4. Mean pooling can be effective for shorter sequences
+5. Last hidden state is a good baseline but may not be optimal
+
+Would you like me to help you implement and test any specific method, or would you like to see how to compare these methods experimentally?
