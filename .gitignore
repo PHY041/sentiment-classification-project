@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data files
+data/
+*.csv
+*.tsv
+
+# Model files
+*.h5
+*.pt
+*.pth
+
+# Logs and output files
+logs/
+*.log
+output/
+
+# Configuration files
+*.ini
+*.cfg
+
+# Environment files
+.DS_Store
+.env
+
+# System files
+Thumbs.db
+
+# MacOS files
+.DS_Store
+
+# Ignore GloVe embeddings if included
+glove.6B.*
+
+# Ignore any large files or datasets
+datasets/
